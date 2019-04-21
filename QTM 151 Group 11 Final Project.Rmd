@@ -1,0 +1,191 @@
+---
+title: "QTM 151 Group 11 Final Project"
+date: "04/18/2019"
+author: "Sylvia Ding, Peter Min, Tony Yang, Yuhua Qin, Diana Wang"
+output:
+  html_document:
+    toc: true
+
+---
+
+## Introduction
+Diet and mental health are always among college students' biggest concerns. From working out, sleeping early, controlling daily diet, taking vitamins, to reading, dancing, hanging out with friends, etc, all of these activities share one common purpose: to become mentally and physically healthy. Through this research, we want to examine how our daily habits affect our health, and therefore make feasible suggestions. 
+
+
+## Data Used 
+For our final project, we decided to analyze data from the National Health and Nutrition Examination Survey (NHANES). 
+This program was introduced in the early 1960s and is designed to examine the health and nutritional conditions of people in the United States. The survey contains a sample of 5000 persons each year and encompasses both quantitative and qualitative examinations.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(Hmisc)
+library(SASxport)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(forcats)
+library(haven)
+
+a <- read.xport("ALQ_I.XPT")
+b <- read.xport("DEMO_I.XPT")
+c <- read.xport("BIOPRO_I.XPT")
+```
+
+## Question #1: Does Alcohol intake correlate with uric acid (umol/L), and does this effect differ by age group?
+
+* Variables: 
+ + IV: ALQ130 - Avg # alcoholic drinks/day - past 12 mos 
+ + IV: DEMO_I - Age in years of the participant at the time of screening.
+ + DV: BIOPRO_I - Uric acid (umol/L) 
+
+
+```{r, warning = FALSE}
+q1 <- inner_join(a, b, by="SEQN")%>%
+  inner_join(., c, by="SEQN")
+
+q1$age <- q1$RIDAGEYR
+
+q1$age<-factor(q1$RIDAGEYR, levels=c("18-20","20-30","30-40","40-50","50-60","60-70","70-80"))
+q1$age[q1$RIDAGEYR <= 20 & q1$RIDAGEYR >18]<-"18-20"
+q1$age[q1$RIDAGEYR <= 30 & q1$RIDAGEYR >20]<-"20-30"
+q1$age[q1$RIDAGEYR <= 40 & q1$RIDAGEYR >30]<-"30-40"
+q1$age[q1$RIDAGEYR <= 50 & q1$RIDAGEYR >40]<-"40-50"
+q1$age[q1$RIDAGEYR <= 60 & q1$RIDAGEYR >50]<-"50-60"
+q1$age[q1$RIDAGEYR <= 70 & q1$RIDAGEYR >60]<-"60-70"
+q1$age[q1$RIDAGEYR <= 80 & q1$RIDAGEYR >70]<-"70-80"
+q1$age[q1$RIDAGEYR <= 18]<-NA
+
+q1 %>%
+  ggplot(aes(x=ALQ130,y=LBXSUA,colour=age)) +
+    geom_point(position = "jitter",alpha = 0.5) +
+    labs(x = "Avg # alcoholic drinks/day - past 12 months", y = "Uric acid (mg/dL)", 
+         title = "Graph01 Relationship between alcohol intake and uric acid in different age groups") +
+    geom_smooth(method="lm") +
+    xlim(0,15) +
+    ylim(1.6,18) +
+    facet_wrap(~age) +
+    theme_light() +
+    theme(plot.title = element_text(hjust = 0.5),title =element_text(size=9, face='bold'),axis.title=element_text(size=10,face="bold"))
+```
+
+### Question 1 Analysis
+  - This question aims to find the relationship between amount of alcohol intake and uric acid in different age groups. By examining this, we can understand both: how alcohol affects uric acid level in general, and how this influence differs in different age groups. By asking how many drinks did participants have in the past 12 months on the average and their experimental data of uric acid, we use ggplot to represent a linear relationship by eight scatter plots divided by age. In our research, a drink refers to a 12 oz. beer, a 5 oz. glass of wine, or one and a half ounces of liquor. 
+
+  - According to the Chemocare, a healthy adult should have normal uric acid levels between 2.4-6.0 mg/dL. High uric acid can cause kidney stone, gout, or other inconveniences. 
+
+  - From the graph below, We see that overall, there exists a positive relationships between alcohol intake and uric acid levels. As the amount of alcohol intake increases, the level of uric acid also increases. This positive correlation shows that excessive drinking can lead to an increase of uric acid, which can affect your health negatively. More specifically, by comparing the steepness (the slope) of the lines, we see that alcohl's effect on uric acid is (relatively) least sensitive for younger group of adults (age 18-20) and most sensitive on elder adults (age group 60-70). Although there isn't a huge difference, we can still assume that alcohol has relatively bigger effect on elder adults, futher suggesting that this group of people should control their alcohol intake.
+
+## Question #2: Which dietary group enjoys the most satisfying results regarding weight control?
+
+* Variables:
+ + DV: WTDRD1 - Dietary day one sample weight
+ + IV: DRQSDT - 13 types of diet
+
+
+### Notes 
+For this specific question, a few assumptions must be made. First, Participants¡¯ responses are recorded based on their habits, and they genuinely reflect their true behaviours. Moreover, prior to the survey, we have to assume that the participants had been on their respective diet for a time span long enough for their body weight to be seen as an effect of the diet, otherwise we cannot accurately quantify the effects of each diet. Also we assume no participant was on more than 1 diet prior to the survey and our hypothesis is that the group on the 'Low Calorie' diet has the lowest median sample body weights.
+ 
+```{r, warning = FALSE}
+nutrition <- read.xport("DR1TOT_I.xpt")
+weight <- read.xport("BMX_I.xpt")
+
+big <- nutrition %>% filter(!is.na(DRQSDIET), DRQSDIET != 9, DRQSDIET != 2)
+big_1 <- weight %>% filter(!is.na(BMXWT))
+new <- left_join(big, big_1, by = "SEQN")
+small <- new %>% gather('DRQSDT1', 'DRQSDT2', 'DRQSDT3', 'DRQSDT4', 
+                        'DRQSDT5', 'DRQSDT6', 'DRQSDT7', 'DRQSDT8', 'DRQSDT9',
+                        'DRQSDT10', 'DRQSDT11', 'DRQSDT12', 'DRQSDT91', 
+                        key = 'Diet_Type', value = 'Diet Type', na.rm = TRUE)
+
+
+small$Diet_Type[small$Diet_Type == 'DRQSDT1'] <- 'Low Calorie'
+small$Diet_Type[small$Diet_Type == 'DRQSDT2'] <- 'Low Cholesterol'
+small$Diet_Type[small$Diet_Type == 'DRQSDT3'] <- 'Low Sodium'
+small$Diet_Type[small$Diet_Type == 'DRQSDT4'] <- 'Low Sugar'
+small$Diet_Type[small$Diet_Type == 'DRQSDT5'] <- 'Low Fiber'
+small$Diet_Type[small$Diet_Type == 'DRQSDT6'] <- 'High Fiber'
+small$Diet_Type[small$Diet_Type == 'DRQSDT7'] <- 'Diabetic'
+small$Diet_Type[small$Diet_Type == 'DRQSDT8'] <- 'Bodybuilding'
+small$Diet_Type[small$Diet_Type == 'DRQSDT9'] <- 'Low Carb'
+small$Diet_Type[small$Diet_Type == 'DRQSDT10'] <- 'High Protein'
+small$Diet_Type[small$Diet_Type == 'DRQSDT11'] <- 'Gluten-Free'
+small$Diet_Type[small$Diet_Type == 'DRQSDT12'] <- 'Renal'
+small$Diet_Type[small$Diet_Type == 'DRQSDT91'] <- 'Other'
+
+
+small %>% group_by(Diet_Type) %>% 
+  drop_na(BMXWT) %>% 
+  summarise(med_weight = median(BMXWT)) %>% 
+  ggplot() +
+  geom_col(aes(x = fct_rev(fct_reorder(Diet_Type, med_weight)), y = med_weight, fill = Diet_Type)) + 
+  labs(x = "Types of Diet", y = "Median Weight (kg)") +
+  ggtitle("Median Weight of Participants On Different Diets") +
+  coord_flip()
+```
+
+### Question 2 Analysis
+It turns out that group on the gluten-free diet enjoys the lowest median sample body weight and solely lowering sugar, carb or calorie intakes do not return significantly different results.
+
+
+## Question #3: Does the length of time spent in U.S affect acculturation, measured by the primary language spoken at home for Asians? 
+
+* Variables:  
+ + DV: ACD110 - Languages spoken at home for Asians
+ + IV: DMDYRSUS - Length of time in US
+
+```{r, fig.width=22, fig.height=12, warning = FALSE}
+acculturationOG <-read.xport("ACQ_I.XPT")
+demographicsOG <- read.xport("DEMO_I.XPT")
+
+demographics <- demographicsOG %>%
+  select("SEQN", "RIAGENDR", "RIDAGEYR", "RIDRETH3", "DMDBORN4", "DMDCITZN", "DMDYRSUS", "SIALANG", "SIAINTRP", "FIALANG") %>%
+  mutate(RIDRETH4 = as.factor(RIDRETH3)) %>%
+  filter(DMDYRSUS >= 1 & DMDYRSUS <=9) %>%
+  mutate(DMDYRSUSnew = as.factor(DMDYRSUS)) 
+
+acculturation <- acculturationOG %>%
+  mutate(ACD110 = as.factor(ACD110)) %>%
+  filter(is.na(ACD110) == FALSE) %>%
+  select(1,6)
+
+levels(demographics$RIDRETH4) <- list("Mexican American"= 1,"Other Hispanic" = 2,"Non-Hispanic White" = 3,"Non-Hispanic Black" = 4,"Non-Hispanic Asian" = 6,"Other Race/Multiracial" = 7)
+levels(demographics$DMDYRSUSnew) <- list("<1" = 1, "1-5" = 2, "5-10" = 3, "10-15" = 4, "15-20" = 5, "20-30" = 6, "30-40" = 7, "40-50" = 8,  ">50" = 9)
+levels(acculturation$ACD110) <- list("Only non-English" = 1, "More non-English than English" = 2, "Both equally" = 3, "More English than non-English" = 4, "Only English" = 5)
+
+acculturation$ACD110 <- as.character(acculturation$ACD110)
+
+data <- inner_join(acculturation, demographics, by = "SEQN") %>%
+  filter(RIDRETH4 == "Non-Hispanic Asian") %>%
+  filter(is.na(ACD110) == FALSE)
+
+lol <- data %>%
+  group_by(DMDYRSUSnew,ACD110) %>%
+  summarise(n()) %>%
+  rename(freq = `n()`) %>%
+  ungroup() %>%
+  group_by(DMDYRSUSnew) %>%
+  mutate(percent = freq/sum(freq)) %>%
+  mutate(languages_spoken = ACD110)
+
+lol$languages_spoken <- as.factor(lol$languages_spoken)
+
+levels(lol$languages_spoken) <- list("Only non-English" = "Only non-English","More non-English than English" ="More non-English than English",
+                                     "Both equally" = "Both equally", "More English than non-English" = "More English than non-English",
+                                     "Only English" = "Only English") 
+
+
+ggplot(lol, aes(x = DMDYRSUSnew, y = percent, fill = languages_spoken)) + geom_col() + facet_grid(~languages_spoken) + 
+  xlab("Years Spent In the US") + ylab("Percent of People Who Speak ___") + 
+  ggtitle("Languages Spoken at Home Based on Years Spent in the US for Asians") + 
+  theme(axis.text.x = element_text(angle= 90, hjust = 0, vjust = 0)) +
+  theme(axis.text=element_text(size=29),
+        axis.title=element_text(size=35),  strip.text = element_text(size = 26)) + theme(plot.title = element_text(size=39, face = "bold"))+ theme(legend.text=element_text(size=30))
+```
+
+### Question 3 Analysis
+The visual analysis shows that as people spend more time in the U.S., more of them will speak English and less of them will speak only a non-English language at home. For this specific dataset, it is hard to make any other generalizations but we believe that for future researches, only using one measurement for acculturation is not a suitable choice since there are many other ways a person can adopt the host society's culture.
+
+
+## Conclusion
+Our project has looked into several important areas regarding the overall wellbeing of people living in the United States. Speculating the issue in three distinctive social perspectives: age and alcohol, weight and dietary style, and foreign alien acculturation, we have found different result that reflects respective social issues. It is shown that alcohol consumption and uric acid has strong correlation with the increase of age. High fiber diet, a popular consumption style among American has shown to be less effective among the other in terms of weight control. Years spent in U.S. shows high correlation with Asiansâ€? ability and frequency of speaking English, which is fair to translate into how well they acculturate. These findings propose that people living in the country should pay more attention to their health by scraping through the surface and follow scientifically proven evidence. People also need to find an appropriate diet that is not only healthy, but also sustainable. Furthermore, adapting to a new country takes time, and people should acknowledge the cultural differences and keep an open mind.
